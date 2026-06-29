@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"os"
 	"sync"
+
 	"github.com/gorilla/websocket"
 )
 
 var (
-	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	upgrader  = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 	clients   = make(map[*websocket.Conn]bool)
 	broadcast = make(chan []byte)
 	mutex     = sync.Mutex{}
@@ -57,8 +58,10 @@ func main() {
 	go handleMessages()
 
 	port := os.Getenv("PORT")
-	if port == "" { port = "8080" }
-	
+	if port == "" {
+		port = "8080"
+	}
+
 	fmt.Println("Sway activo en puerto:", port)
 	http.ListenAndServe(":"+port, nil)
 }
