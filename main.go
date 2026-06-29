@@ -4,16 +4,20 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-
 	"github.com/gorilla/websocket"
 )
 
+// Configuración del WebSocket
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
-	ws, _ := upgrader.Upgrade(w, r, nil)
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	defer ws.Close()
 
 	for {
@@ -21,8 +25,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
-		fmt.Printf("Sway recibió: %s\n", msg)
-		// Reenviamos el mensaje a quien esté conectado
+		// Reenviamos el mensaje recibido
 		err = ws.WriteMessage(1, msg)
 		if err != nil {
 			break
@@ -31,19 +34,23 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// 1. Decirle a Go que sirva los archivos de la carpeta actual
-	fs := http.FileServer(http.Dir("./"))
-	http.Handle("/", fs)
+	// 1. Servir el archivo index.html directamente cuando alguien entra a la raíz
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "index.html")
+	})
 
-	// 2. Tu ruta de WebSocket sigue igual
+	// 2. Ruta del WebSocket
 	http.HandleFunc("/ws", handleConnections)
 
-	fmt.Println("Sway está activo en el puerto :8080")
-
-	// 3. Ajuste importante para Render (usa la variable de entorno PORT)
+	// 3. Obtener el puerto de Render o usar 8080 por defecto
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	http.ListenAndServe(":"+port, nil)
+
+	fmt.Println("Sway activo en el puerto:", port)
+	err := http.ListenAndServe(":"+port, nil)
+	if err != nil {
+		fmt.Println("Error al iniciar el servidor:", err)
+	}
 }
