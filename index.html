@@ -1,65 +1,53 @@
-package main
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sway - Chat</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding-top: 50px; margin: 0; }
+        h2 { color: #333; }
+        #chat-box { width: 400px; height: 500px; background: white; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        #messages { flex-grow: 1; }
+        .msg { background: #e4e6eb; padding: 10px; border-radius: 10px; margin-bottom: 10px; width: fit-content; }
+        #input-area { display: flex; gap: 10px; width: 400px; margin-top: 15px; }
+        input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+        button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #0073e6; }
+    </style>
+</head>
+<body>
 
-import (
-	"fmt"
-	"net/http"
-	"os"
-	"sync"
-	"github.com/gorilla/websocket"
-)
+    <h2>Sway</h2>
+    <div id="chat-box">
+        <div id="messages"></div>
+    </div>
+    <div id="input-area">
+        <input id="input" type="text" placeholder="Escribe algo...">
+        <button onclick="send()">Enviar</button>
+    </div>
 
-var (
-	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	// Creamos un mapa para guardar todos los clientes conectados
-	clients   = make(map[*websocket.Conn]bool)
-	broadcast = make(chan []byte) // Canal para enviar mensajes a todos
-	mutex     = sync.Mutex{}      // Para que no se bloquee si varios escriben a la vez
-)
+    <script>
+        // Detecta automáticamente si la conexión debe ser ws:// o wss:// (seguro)
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const ws = new WebSocket(protocol + window.location.host + "/ws");
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
-	ws, _ := upgrader.Upgrade(w, r, nil)
-	defer ws.Close()
+        ws.onmessage = (event) => {
+            const messagesDiv = document.getElementById("messages");
+            const newMsg = document.createElement("div");
+            newMsg.className = "msg";
+            newMsg.innerText = event.data;
+            messagesDiv.appendChild(newMsg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
 
-	mutex.Lock()
-	clients[ws] = true
-	mutex.Unlock()
-
-	for {
-		_, msg, err := ws.ReadMessage()
-		if err != nil {
-			mutex.Lock()
-			delete(clients, ws)
-			mutex.Unlock()
-			break
-		}
-		// En lugar de responder al cliente, enviamos el mensaje al canal "broadcast"
-		broadcast <- msg
-	}
-}
-
-func handleMessages() {
-	for {
-		msg := <-broadcast
-		// Enviamos el mensaje a TODOS los clientes conectados
-		mutex.Lock()
-		for client := range clients {
-			err := client.WriteMessage(1, msg)
-			if err != nil {
-				client.Close()
-				delete(clients, client)
-			}
-		}
-		mutex.Unlock()
-	}
-}
-
-func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "index.html") })
-	http.HandleFunc("/ws", handleConnections)
-
-	go handleMessages() // Iniciamos el proceso que reenvía mensajes en segundo plano
-
-	port := os.Getenv("PORT")
-	if port == "" { port = "8080" }
-	http.ListenAndServe(":"+port, nil)
-}
+        function send() {
+            const input = document.getElementById("input");
+            if (input.value.trim() !== "") {
+                ws.send(input.value);
+                input.value = "";
+            }
+        }
+    </script>
+</body>
+</html>
