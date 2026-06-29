@@ -4,53 +4,61 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"github.com/gorilla/websocket"
 )
 
-// Configuración del WebSocket
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
+var (
+	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	clients   = make(map[*websocket.Conn]bool)
+	broadcast = make(chan []byte)
+	mutex     = sync.Mutex{}
+)
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	ws, _ := upgrader.Upgrade(w, r, nil)
 	defer ws.Close()
+
+	mutex.Lock()
+	clients[ws] = true
+	mutex.Unlock()
 
 	for {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
+			mutex.Lock()
+			delete(clients, ws)
+			mutex.Unlock()
 			break
 		}
-		// Reenviamos el mensaje recibido
-		err = ws.WriteMessage(1, msg)
-		if err != nil {
-			break
+		broadcast <- msg
+	}
+}
+
+func handleMessages() {
+	for {
+		msg := <-broadcast
+		mutex.Lock()
+		for client := range clients {
+			err := client.WriteMessage(1, msg)
+			if err != nil {
+				client.Close()
+				delete(clients, client)
+			}
 		}
+		mutex.Unlock()
 	}
 }
 
 func main() {
-	// 1. Servir el archivo index.html directamente cuando alguien entra a la raíz
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
-
-	// 2. Ruta del WebSocket
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "index.html") })
 	http.HandleFunc("/ws", handleConnections)
 
-	// 3. Obtener el puerto de Render o usar 8080 por defecto
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	go handleMessages()
 
-	fmt.Println("Sway activo en el puerto:", port)
-	err := http.ListenAndServe(":"+port, nil)
-	if err != nil {
-		fmt.Println("Error al iniciar el servidor:", err)
-	}
+	port := os.Getenv("PORT")
+	if port == "" { port = "8080" }
+	
+	fmt.Println("Sway activo en puerto:", port)
+	http.ListenAndServe(":"+port, nil)
 }
