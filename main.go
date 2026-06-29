@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -18,9 +17,7 @@ var (
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		return
-	}
+	if err != nil { return }
 	defer ws.Close()
 
 	// Registro de usuario
@@ -47,13 +44,19 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("LOG: Mensaje de", username, ":", message)
 
 		if strings.HasPrefix(message, "@") {
+			// Separamos solo en 2 partes: [nombre, mensaje]
 			parts := strings.SplitN(message, " ", 2)
 			target := strings.TrimPrefix(parts[0], "@")
-
+			
 			mutex.Lock()
+			// Verificamos si existe el usuario y si hay un mensaje después del nombre
 			if conn, ok := clients[target]; ok {
-				conn.WriteMessage(1, []byte("(Privado de "+username+"): "+parts[1]))
-				fmt.Println("LOG: Mensaje privado enviado a", target)
+				if len(parts) > 1 {
+					conn.WriteMessage(1, []byte("(Privado de "+username+"): "+parts[1]))
+					fmt.Println("LOG: Mensaje privado enviado a", target)
+				} else {
+					ws.WriteMessage(1, []byte("SISTEMA: Error, formato: @usuario mensaje"))
+				}
 			} else {
 				ws.WriteMessage(1, []byte("SISTEMA: Usuario "+target+" no encontrado"))
 			}
@@ -71,10 +74,10 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "index.html") })
 	http.HandleFunc("/ws", handleConnections)
+	
 	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	if port == "" { port = "8080" }
+	
 	fmt.Println("Sway activo en puerto:", port)
 	http.ListenAndServe(":"+port, nil)
 }
