@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sway - Chat</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding-top: 50px; margin: 0; }
+        h2 { color: #333; }
+        #chat-box { width: 400px; height: 500px; background: white; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        #messages { flex-grow: 1; }
+        .msg { background: #e4e6eb; padding: 10px; border-radius: 10px; margin-bottom: 10px; width: fit-content; }
+        #input-area { display: flex; gap: 10px; width: 400px; margin-top: 15px; }
+        input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+        button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #0073e6; }
+    </style>
+</head>
+<body>
+
+    <h2>Sway</h2>
+    <div id="chat-box">
+        <div id="messages"></div>
+    </div>
+    <div id="input-area">
+        <input id="input" type="text" placeholder="Escribe algo...">
+        <button onclick="send()">Enviar</button>
+    </div>
+
+    <script>
+        // Detecta automáticamente si la conexión debe ser ws:// o wss:// (seguro)
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const ws = new WebSocket(protocol + window.location.host + "/ws");
+
+        ws.onmessage = (event) => {
+            const messagesDiv = document.getElementById("messages");
+            const newMsg = document.createElement("div");
+            newMsg.className = "msg";
+            newMsg.innerText = event.data;
+            messagesDiv.appendChild(newMsg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+
+        function send() {
+            const input = document.getElementById("input");
+            if (input.value.trim() !== "") {
+                ws.send(input.value);
+                input.value = "";
+            }
+        }
+    </script>
+</body>
+</html>
