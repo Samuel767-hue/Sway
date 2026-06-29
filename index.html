@@ -42,7 +42,12 @@
         <input id="input" type="text" placeholder="Escribe un comentario..." autocomplete="off">
         <button onclick="send()">Enviar</button>
     </div>
-
+    
+    <div id="login">
+    <input id="username" placeholder="Tu nombre...">
+    <button onclick="join()">Entrar</button>
+</div>
+    
     <script>
         const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
         const ws = new WebSocket(protocol + window.location.host + "/ws");
