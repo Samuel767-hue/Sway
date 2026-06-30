@@ -1,5 +1,5 @@
 module sway-chat
 
-go 1.21
+go 1.26.4
 
-require github.com/gorilla/websocket v1.5.1
+require github.com/gorilla/websocket v1.5.3
