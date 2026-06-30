@@ -95,18 +95,24 @@
         let pendingRequests = [];
         let friends = [];
         
-        window.onload = () => {
-            // Cargar primero los chats de la comunidad globales
+        // Carga inmediata de datos desde el almacenamiento local
+        function loadStorage() {
+            const savedName = localStorage.getItem("swayUsername");
             chatHistories["comunidad"] = JSON.parse(localStorage.getItem("swayCommunityChats")) || [];
-            
+            if (savedName) {
+                friends = JSON.parse(localStorage.getItem("swayFriends_" + savedName)) || [];
+                const savedPriv = JSON.parse(localStorage.getItem("swayChats_" + savedName)) || {};
+                Object.assign(chatHistories, savedPriv);
+            }
+        }
+
+        window.onload = () => {
+            loadStorage();
             const savedName = localStorage.getItem("swayUsername");
             if (savedName) {
-                setTimeout(() => { 
-                    ws.send(savedName); 
-                    document.getElementById("login-screen").style.display = "none"; 
-                    loadUserData(savedName);
-                    switchTab("comunidad"); 
-                }, 500);
+                document.getElementById("login-screen").style.display = "none";
+                ws.onopen = () => ws.send(savedName);
+                switchTab("comunidad");
             }
         };
 
@@ -125,40 +131,25 @@
 
         function loginSuccess(name) {
             localStorage.setItem("swayUsername", name);
+            loadStorage();
             ws.send(name);
             document.getElementById("login-screen").style.display = "none";
-            loadUserData(name);
             switchTab("comunidad");
-        }
-
-        function loadUserData(username) {
-            // Carga amigos y chats privados específicos de esta cuenta
-            friends = JSON.parse(localStorage.getItem("swayFriends_" + username)) || [];
-            
-            const savedPrivateChats = JSON.parse(localStorage.getItem("swayChats_" + username)) || {};
-            // Mezclar chats privados cargados con el de la comunidad que ya existía
-            chatHistories = { "comunidad": chatHistories["comunidad"], ...savedPrivateChats };
-        }
-
-        function saveFriends() {
-            const myName = localStorage.getItem("swayUsername");
-            if (myName) {
-                localStorage.setItem("swayFriends_" + myName, JSON.stringify(friends));
-            }
         }
 
         function saveChats() {
             const myName = localStorage.getItem("swayUsername");
-            
-            // Guardar chat público independientemente
             localStorage.setItem("swayCommunityChats", JSON.stringify(chatHistories["comunidad"]));
-            
-            // Separar y guardar chats privados vinculados al usuario actual
             if (myName) {
                 const privateChats = { ...chatHistories };
-                delete privateChats["comunidad"]; // No mezclar lo público en la clave privada
+                delete privateChats["comunidad"];
                 localStorage.setItem("swayChats_" + myName, JSON.stringify(privateChats));
             }
+        }
+
+        function saveFriends() {
+            const myName = localStorage.getItem("swayUsername");
+            if (myName) localStorage.setItem("swayFriends_" + myName, JSON.stringify(friends));
         }
 
         function decodeJwtResponse(token) {
@@ -168,50 +159,23 @@
             return JSON.parse(jsonPayload);
         }
 
-        function handleGoogleLogin(response) {
-            const responsePayload = decodeJwtResponse(response.credential);
-            loginSuccess(responsePayload.name);
-        }
+        function handleGoogleLogin(response) { loginSuccess(decodeJwtResponse(response.credential).name); }
 
         ws.onmessage = (event) => {
             const myName = localStorage.getItem("swayUsername");
             const msgData = event.data;
-            
             const privMatch = msgData.match(/^\(Privado de (.*?)\): (.*)$/);
             if (privMatch) {
-                const sender = privMatch[1];
-                const content = privMatch[2];
-                
-                if (content === "/SYS_REQ") { 
-                    if (!pendingRequests.includes(sender)) { pendingRequests.push(sender); updateBell(); } 
-                    return; 
-                }
-                if (content === "/SYS_ACC") { 
-                    if (!friends.includes(sender)) { friends.push(sender); saveFriends(); }
-                    addMessageToHistory(sender, "¡Ahora sois amigos!", "sys"); 
-                    saveChats();
-                    if (currentMode === sender) renderChat();
-                    else if (currentMode === "privado_list") renderFriendsList();
-                    return; 
-                }
-                
-                if (!friends.includes(sender)) {
-                    friends.push(sender);
-                    saveFriends();
-                }
-
-                addMessageToHistory(sender, content, "them");
-                saveChats();
-                if (currentMode === sender) renderChat(); 
-                else if (currentMode === "privado_list") renderFriendsList();
-                else document.getElementById("tab-privado").innerText = "Privado 🔴";
+                const sender = privMatch[1]; const content = privMatch[2];
+                if (content === "/SYS_REQ") { if (!pendingRequests.includes(sender)) { pendingRequests.push(sender); updateBell(); } return; }
+                if (content === "/SYS_ACC") { if (!friends.includes(sender)) friends.push(sender); saveFriends(); addMessageToHistory(sender, "¡Ahora sois amigos!", "sys"); saveChats(); render(); return; }
+                if (!friends.includes(sender)) { friends.push(sender); saveFriends(); }
+                addMessageToHistory(sender, content, "them"); saveChats(); render();
                 return;
             }
             let sender = "them"; let text = msgData;
             if (msgData.startsWith(myName + ": ")) { sender = "me"; text = msgData.replace(myName + ": ", ""); }
-            addMessageToHistory("comunidad", text, sender);
-            saveChats();
-            if (currentMode === "comunidad") renderChat();
+            addMessageToHistory("comunidad", text, sender); saveChats(); render();
         };
 
         function addMessageToHistory(chatName, text, type) {
@@ -219,22 +183,22 @@
             chatHistories[chatName].push({ text, type });
         }
 
+        function render() {
+            if (currentMode === "privado_list") renderFriendsList();
+            else renderChat();
+        }
+
         function renderChat() {
             const container = document.getElementById("chat-container");
             container.innerHTML = "";
-            
             if (currentMode !== "comunidad" && currentMode !== "privado_list") {
                 const backBar = document.createElement("div");
-                backBar.className = "back-chat-bar";
-                backBar.innerText = "← Volver a Amigos";
+                backBar.className = "back-chat-bar"; backBar.innerText = "← Volver a Amigos";
                 backBar.onclick = () => switchTab("privado_list");
                 container.appendChild(backBar);
             }
-
             (chatHistories[currentMode] || []).forEach(msg => {
-                const div = document.createElement("div");
-                div.className = "msg msg-" + msg.type;
-                div.innerText = msg.text;
+                const div = document.createElement("div"); div.className = "msg msg-" + msg.type; div.innerText = msg.text;
                 container.appendChild(div);
             });
             container.scrollTop = container.scrollHeight;
@@ -242,61 +206,22 @@
 
         function renderFriendsList() {
             const container = document.getElementById("chat-container");
-            container.innerHTML = "";
-
-            const addBtn = document.createElement("button");
-            addBtn.className = "btn-add-friend";
-            addBtn.innerText = "+ Añadir amigo por nombre";
-            addBtn.onclick = promptAddFriend;
-            container.appendChild(addBtn);
-
-            if (friends.length === 0) {
-                const empty = document.createElement("div");
-                empty.style.color = "#666";
-                empty.style.textAlign = "center";
-                empty.style.marginTop = "30px";
-                empty.innerText = "No tienes amigos guardados todavía.";
-                container.appendChild(empty);
-                return;
-            }
-
+            container.innerHTML = `<button class="btn-add-friend" onclick="promptAddFriend()">+ Añadir amigo</button>`;
             friends.forEach(friend => {
-                const item = document.createElement("div");
-                item.className = "friend-item";
-                item.onclick = () => switchTab(friend);
-
-                const initial = friend.charAt(0).toUpperCase();
-                let lastMsg = "Sin mensajes aún";
-                const history = chatHistories[friend];
-                if (history && history.length > 0) {
-                    const last = history[history.length - 1];
-                    lastMsg = (last.type === "me" ? "Tú: " : "") + last.text;
-                }
-
-                item.innerHTML = `
-                    <div class="friend-avatar">${initial}</div>
-                    <div class="friend-info">
-                        <div class="friend-name">${friend}</div>
-                        <div class="friend-lastmsg">${lastMsg}</div>
-                    </div>
-                `;
+                const item = document.createElement("div"); item.className = "friend-item"; item.onclick = () => switchTab(friend);
+                const history = chatHistories[friend] || [];
+                const lastMsg = history.length > 0 ? (history[history.length-1].type === "me" ? "Tú: " : "") + history[history.length-1].text : "Sin mensajes";
+                item.innerHTML = `<div class="friend-avatar">${friend[0].toUpperCase()}</div><div class="friend-info"><div class="friend-name">${friend}</div><div class="friend-lastmsg">${lastMsg}</div></div>`;
                 container.appendChild(item);
             });
         }
 
         function promptAddFriend() {
-            const target = prompt("¿A quién quieres añadir de amigo?");
-            if (target && target.trim() !== "") {
-                const cleanTarget = target.trim();
-                if (!friends.includes(cleanTarget)) {
-                    friends.push(cleanTarget);
-                    saveFriends();
-                }
-                ws.send("@" + cleanTarget + " /SYS_REQ");
-                if (!chatHistories[cleanTarget]) chatHistories[cleanTarget] = [];
-                addMessageToHistory(cleanTarget, "Petición de amistad enviada...", "sys");
-                saveChats();
-                switchTab(cleanTarget);
+            const target = prompt("¿Con quién quieres hablar?");
+            if (target) {
+                if (!friends.includes(target)) { friends.push(target); saveFriends(); }
+                ws.send("@" + target + " /SYS_REQ");
+                switchTab(target);
             }
         }
 
@@ -304,24 +229,8 @@
             currentMode = mode;
             document.getElementById("tab-comunidad").classList.toggle("active", mode === "comunidad");
             document.getElementById("tab-privado").classList.toggle("active", mode !== "comunidad");
-            
-            const inputArea = document.getElementById("input-area");
-
-            if (mode === "comunidad") {
-                inputArea.style.display = "flex";
-                document.getElementById("input").placeholder = "Mensaje a la comunidad...";
-                document.getElementById("tab-privado").innerText = "Privado 🔒";
-                renderChat();
-            } else if (mode === "privado_list") {
-                inputArea.style.display = "none";
-                document.getElementById("tab-privado").innerText = "Privado 🔒";
-                renderFriendsList();
-            } else {
-                inputArea.style.display = "flex";
-                document.getElementById("input").placeholder = "Mensaje para " + mode + "...";
-                document.getElementById("tab-privado").innerText = mode + " 🔒";
-                renderChat();
-            }
+            document.getElementById("input-area").style.display = (mode === "privado_list") ? "none" : "flex";
+            render();
         }
 
         function updateBell() {
@@ -331,42 +240,19 @@
             const list = document.getElementById("notif-list");
             list.innerHTML = "";
             pendingRequests.forEach(req => {
-                const item = document.createElement("div");
-                item.className = "notif-item";
-                item.innerHTML = `<span>${req} quiere ser tu amigo</span> <button class="btn-acc" onclick="acceptRequest('${req}')">Aceptar</button>`;
+                const item = document.createElement("div"); item.className = "notif-item";
+                item.innerHTML = `<span>${req}</span> <button class="btn-acc" onclick="acceptRequest('${req}')">Aceptar</button>`;
                 list.appendChild(item);
             });
         }
 
-        function toggleNotifs() { const panel = document.getElementById("notif-panel"); panel.style.display = panel.style.display === "flex" ? "none" : "flex"; }
-        
-        function acceptRequest(user) { 
-            pendingRequests = pendingRequests.filter(u => u !== user); 
-            updateBell(); 
-            toggleNotifs(); 
-            
-            if (!friends.includes(user)) {
-                friends.push(user);
-                saveFriends();
-            }
-            
-            ws.send("@" + user + " /SYS_ACC"); 
-            addMessageToHistory(user, "¡Ahora sois amigos!", "sys");
-            saveChats();
-            switchTab(user); 
-        }
-
+        function toggleNotifs() { document.getElementById("notif-panel").style.display = (document.getElementById("notif-panel").style.display === "flex" ? "none" : "flex"); }
+        function acceptRequest(user) { pendingRequests = pendingRequests.filter(u => u !== user); updateBell(); toggleNotifs(); if (!friends.includes(user)) { friends.push(user); saveFriends(); } ws.send("@" + user + " /SYS_ACC"); switchTab(user); }
         function send() {
             const input = document.getElementById("input"); const text = input.value.trim();
             if (text !== "") { 
-                if (currentMode === "comunidad") {
-                    ws.send(text); 
-                } else { 
-                    ws.send("@" + currentMode + " " + text); 
-                    addMessageToHistory(currentMode, text, "me"); 
-                    renderChat(); 
-                } 
-                saveChats();
+                if (currentMode === "comunidad") ws.send(text); 
+                else { ws.send("@" + currentMode + " " + text); addMessageToHistory(currentMode, text, "me"); saveChats(); render(); } 
                 input.value = ""; 
             }
         }
