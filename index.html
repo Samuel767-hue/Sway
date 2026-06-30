@@ -5,39 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sway - Live</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { margin: 0; background: #000; color: #fff; font-family: -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Pantalla de Login mejorada */
-        #login-screen { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #000; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; z-index: 100; padding: 20px;
-        }
-        #login-box {
-            background: #121212; padding: 40px; border-radius: 20px;
-            text-align: center; width: 100%; max-width: 320px; border: 1px solid #333;
-        }
-        #login-box h2 { margin-bottom: 25px; font-weight: 700; }
+        /* Login */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; z-index: 100; }
+        #login-box { background: #121212; padding: 40px; border-radius: 20px; text-align: center; width: 80%; max-width: 320px; border: 1px solid #333; }
         
-        /* Estilos del chat */
+        /* Chat */
         #chat-container { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .msg { background: #262626; padding: 12px 18px; border-radius: 18px; width: fit-content; max-width: 85%; }
+        .msg { background: #262626; padding: 12px 18px; border-radius: 18px; width: fit-content; max-width: 85%; align-self: flex-start; }
         
-        /* Input y Botones */
+        /* Estilo para tus mensajes */
+        .my-msg { background: #fff; color: #000; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 5px; }
+        
+        /* Input */
         #input-area { padding: 20px; background: #000; display: flex; gap: 10px; border-top: 1px solid #262626; }
         input { flex-grow: 1; padding: 14px; border-radius: 25px; border: 1px solid #444; background: #1a1a1a; color: white; outline: none; }
-        button { padding: 12px 25px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:hover { background: #e6284d; }
+        button { padding: 12px 25px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <div id="login-box">
-            <h2 style="font-size: 24px;">¡Bienvenido a Sway!</h2>
-            <input id="username" placeholder="Tu nombre de usuario...">
+            <h2>¡Bienvenido a Sway!</h2>
+            <input id="username" placeholder="Tu nombre...">
             <br><br>
-            <button onclick="register()" style="width: 100%;">Entrar al chat</button>
+            <button onclick="register()" style="width: 100%;">Entrar</button>
         </div>
     </div>
 
@@ -49,8 +43,7 @@
     </div>
 
     <script>
-        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-        const ws = new WebSocket(protocol + window.location.host + "/ws");
+        const ws = new WebSocket((window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws");
 
         window.onload = () => {
             const savedName = localStorage.getItem("swayUsername");
@@ -73,9 +66,20 @@
 
         ws.onmessage = (event) => {
             const messagesDiv = document.getElementById("messages");
+            const myName = localStorage.getItem("swayUsername");
+            const msgData = event.data;
+            
             const newMsg = document.createElement("div");
             newMsg.className = "msg";
-            newMsg.innerText = event.data;
+            
+            // Si el mensaje empieza con "MiNombre: ", es mío
+            if (msgData.startsWith(myName + ": ")) {
+                newMsg.classList.add("my-msg");
+                newMsg.innerText = msgData.replace(myName + ": ", "");
+            } else {
+                newMsg.innerText = msgData;
+            }
+            
             messagesDiv.appendChild(newMsg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         };
