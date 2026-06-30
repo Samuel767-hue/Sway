@@ -5,31 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sway - Live</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Helvetica', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Pantalla de Login */
+        /* Pantalla de Login mejorada */
         #login-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: #000; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; z-index: 100; 
+            justify-content: center; align-items: center; z-index: 100; padding: 20px;
         }
+        #login-box {
+            background: #121212; padding: 40px; border-radius: 20px;
+            text-align: center; width: 100%; max-width: 320px; border: 1px solid #333;
+        }
+        #login-box h2 { margin-bottom: 25px; font-weight: 700; }
         
-        /* Chat */
-        #chat-container { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { background: rgba(255, 255, 255, 0.1); padding: 10px 15px; border-radius: 15px; width: fit-content; max-width: 80%; backdrop-filter: blur(5px); }
+        /* Estilos del chat */
+        #chat-container { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { background: #262626; padding: 12px 18px; border-radius: 18px; width: fit-content; max-width: 85%; }
         
-        /* Input area */
-        #input-area { padding: 20px; background: rgba(0,0,0,0.8); display: flex; gap: 10px; border-top: 1px solid #333; }
-        input { flex-grow: 1; padding: 12px; border-radius: 25px; border: none; background: #222; color: white; outline: none; }
-        button { padding: 10px 20px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
+        /* Input y Botones */
+        #input-area { padding: 20px; background: #000; display: flex; gap: 10px; border-top: 1px solid #262626; }
+        input { flex-grow: 1; padding: 14px; border-radius: 25px; border: 1px solid #444; background: #1a1a1a; color: white; outline: none; }
+        button { padding: 12px 25px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #e6284d; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h2 style="margin-bottom: 20px;">Bienvenido a Sway</h2>
-        <input id="username" placeholder="Elige tu nombre...">
-        <button style="margin-top: 15px;" onclick="register()">Entrar</button>
+        <div id="login-box">
+            <h2 style="font-size: 24px;">¡Bienvenido a Sway!</h2>
+            <input id="username" placeholder="Tu nombre de usuario...">
+            <br><br>
+            <button onclick="register()" style="width: 100%;">Entrar al chat</button>
+        </div>
     </div>
 
     <div id="chat-container"><div id="messages"></div></div>
@@ -43,7 +52,6 @@
         const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
         const ws = new WebSocket(protocol + window.location.host + "/ws");
 
-        // Al cargar, verificar si ya nos conocemos
         window.onload = () => {
             const savedName = localStorage.getItem("swayUsername");
             if (savedName) {
@@ -55,7 +63,7 @@
         };
 
         function register() {
-            const name = document.getElementById("username").value;
+            const name = document.getElementById("username").value.trim();
             if (name) {
                 localStorage.setItem("swayUsername", name);
                 ws.send(name);
