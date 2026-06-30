@@ -3,35 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sway</title>
+    <title>Sway - Live</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; margin: 0; }
-        #chat { flex-grow: 1; overflow-y: auto; padding: 20px; }
-        .msg { background: #222; padding: 10px; border-radius: 10px; margin-bottom: 5px; }
-        #input-area { padding: 20px; display: flex; gap: 10px; border-top: 1px solid #333; }
-        input { flex-grow: 1; padding: 12px; border-radius: 20px; border: none; outline: none; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Helvetica', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Pantalla de Login */
+        #login-screen { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #000; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; z-index: 100; 
+        }
+        
+        /* Chat */
+        #chat-container { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { background: rgba(255, 255, 255, 0.1); padding: 10px 15px; border-radius: 15px; width: fit-content; max-width: 80%; backdrop-filter: blur(5px); }
+        
+        /* Input area */
+        #input-area { padding: 20px; background: rgba(0,0,0,0.8); display: flex; gap: 10px; border-top: 1px solid #333; }
+        input { flex-grow: 1; padding: 12px; border-radius: 25px; border: none; background: #222; color: white; outline: none; }
+        button { padding: 10px 20px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div id="chat"><div id="messages"></div></div>
+
+    <div id="login-screen">
+        <h2 style="margin-bottom: 20px;">Bienvenido a Sway</h2>
+        <input id="username" placeholder="Elige tu nombre...">
+        <button style="margin-top: 15px;" onclick="register()">Entrar</button>
+    </div>
+
+    <div id="chat-container"><div id="messages"></div></div>
+
     <div id="input-area">
-        <input id="input" placeholder="Nombre (al entrar) o @usuario mensaje...">
+        <input id="input" type="text" placeholder="@usuario mensaje..." autocomplete="off">
         <button onclick="send()">Enviar</button>
     </div>
+
     <script>
-        const ws = new WebSocket((window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws");
-        let initialized = false;
-        ws.onmessage = (e) => {
-            const div = document.createElement("div");
-            div.className = "msg";
-            div.innerText = e.data;
-            document.getElementById("messages").appendChild(div);
+        const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+        const ws = new WebSocket(protocol + window.location.host + "/ws");
+
+        // Al cargar, verificar si ya nos conocemos
+        window.onload = () => {
+            const savedName = localStorage.getItem("swayUsername");
+            if (savedName) {
+                setTimeout(() => {
+                    ws.send(savedName);
+                    document.getElementById("login-screen").style.display = "none";
+                }, 500);
+            }
         };
-        function send() {
-            const inp = document.getElementById("input");
-            ws.send(inp.value);
-            inp.value = "";
+
+        function register() {
+            const name = document.getElementById("username").value;
+            if (name) {
+                localStorage.setItem("swayUsername", name);
+                ws.send(name);
+                document.getElementById("login-screen").style.display = "none";
+            }
         }
+
+        ws.onmessage = (event) => {
+            const messagesDiv = document.getElementById("messages");
+            const newMsg = document.createElement("div");
+            newMsg.className = "msg";
+            newMsg.innerText = event.data;
+            messagesDiv.appendChild(newMsg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+
+        function send() {
+            const input = document.getElementById("input");
+            if (input.value.trim() !== "") {
+                ws.send(input.value);
+                input.value = "";
+            }
+        }
+
+        document.getElementById("input").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") send();
+        });
     </script>
 </body>
 </html>
