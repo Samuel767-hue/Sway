@@ -3,60 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <title>Sway</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         body{margin:0;background:#000;color:#fff;font-family:sans-serif;height:100vh;display:flex;flex-direction:column}
-        #profile{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#121212;padding:10px 25px;border-radius:25px;z-index:5}
-        #chat{flex:1;overflow:auto;padding:70px 20px 20px}
-        .msg{padding:10px 15px;border-radius:15px;margin:8px;max-width:80%;word-wrap:break-word;}
+        #top{padding:15px;text-align:center;font-weight:bold}
+        #chat{flex:1;overflow-y:auto;padding:20px}
+        .msg{padding:10px 15px;border-radius:15px;margin:8px;max-width:80%}
         .me{background:white;color:black;margin-left:auto}
         .them{background:#262626}
-        #bar{display:flex;padding:15px;gap:10px}
+        #tabs{display:flex;background:#121212}
+        .tab{flex:1;padding:15px;text-align:center;cursor:pointer}
+        .active{border-bottom:2px solid #fe2c55}
+        #bar{display:flex;padding:15px;gap:10px;background:#121212}
         input{flex:1;padding:12px;border-radius:20px;border:none}
+        #login{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:10}
     </style>
 </head>
 <body>
-    <div id="profile">👤 <span id="name"></span></div>
+    <div id="login">
+        <h2>Sway</h2>
+        <div id="g_id_onload" data-client_id="531379066398-v8r20953jk0hugfsjj1a9ij65nd3hqas.apps.googleusercontent.com" data-callback="handleLogin"></div>
+        <div class="g_id_signin"></div>
+        <input id="n" placeholder="Nombre inventado...">
+        <button onclick="login()">Entrar</button>
+    </div>
+
+    <div id="top">👤 <span id="user"></span></div>
     <div id="chat"></div>
+    <div id="tabs">
+        <div class="tab active" onclick="setMode('comunidad')">Comunidad</div>
+        <div class="tab" onclick="setMode('privado')">Privado 🔒</div>
+    </div>
     <div id="bar">
-        <input id="input" placeholder="Escribe algo...">
+        <input id="input">
         <button onclick="send()">Enviar</button>
     </div>
 
     <script>
-        // 1. Obtener nombre y conectar
-        let user = prompt("Introduce tu nombre:") || "Invitado";
-        document.getElementById("name").innerText = user;
+        let mode = 'comunidad';
+        let user = localStorage.getItem("swayUser");
+        let ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
 
-        let ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+        function handleLogin(res) {
+            let p = JSON.parse(atob(res.credential.split('.')[1]));
+            saveUser(p.name);
+        }
 
-        ws.onopen = () => {
-            ws.send(user); // Enviamos el nombre nada más conectar
-        };
+        function login() { saveUser(document.getElementById('n').value); }
+
+        function saveUser(name) {
+            user = name;
+            localStorage.setItem("swayUser", name);
+            document.getElementById("user").innerText = name;
+            document.getElementById("login").style.display = 'none';
+            ws.send(name);
+        }
+
+        if(user) { document.getElementById("user").innerText = user; document.getElementById("login").style.display = 'none'; ws.onopen = () => ws.send(user); }
 
         ws.onmessage = e => {
-            let t = e.data;
-            // Si el mensaje empieza con "TuNombre: ", es tuyo
-            let c = t.startsWith(user + ": ") ? "me" : "them";
-            if(c === "me") t = t.replace(user + ": ", "");
-            add(t, c);
+            let data = e.data;
+            let d = document.createElement("div");
+            d.className = "msg " + (data.startsWith(user+": ") ? "me" : "them");
+            d.innerText = data.replace(user+": ", "");
+            document.getElementById("chat").appendChild(d);
         };
 
-        function send(){
+        function send() {
             let i = document.getElementById("input");
-            if(i.value.trim()){
-                ws.send(i.value);
-                i.value = "";
-            }
+            ws.send((mode === 'privado' ? "@" : "") + i.value);
+            i.value = "";
         }
 
-        function add(t, c){
-            let d = document.createElement("div");
-            d.className = "msg " + c;
-            d.innerText = t;
-            let chat = document.getElementById("chat");
-            chat.appendChild(d);
-            chat.scrollTop = chat.scrollHeight; // Auto-scroll al final
-        }
+        function setMode(m) { mode = m; document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.innerText.toLowerCase().includes(m))); }
     </script>
 </body>
 </html>
