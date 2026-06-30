@@ -14,7 +14,6 @@ import (
 
 var db *sql.DB
 
-
 var (
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -27,8 +26,6 @@ var (
 	mutex = sync.Mutex{}
 )
 
-
-
 func saveCommunityMessage(username string, message string) {
 
 	_, err := db.Exec(
@@ -38,50 +35,38 @@ func saveCommunityMessage(username string, message string) {
 		"community",
 	)
 
-
 	if err != nil {
 		fmt.Println("Error SQLite:", err)
 	}
 
 }
 
-
-
 func sendHistory(ws *websocket.Conn) {
-
 
 	rows, err := db.Query(
 		"SELECT username,message FROM messages ORDER BY id ASC",
 	)
-
 
 	if err != nil {
 		fmt.Println("Error leyendo historial:", err)
 		return
 	}
 
-
 	defer rows.Close()
-
-
 
 	for rows.Next() {
 
-
 		var user string
 		var msg string
-
 
 		err := rows.Scan(
 			&user,
 			&msg,
 		)
 
-
 		if err != nil {
 			continue
 		}
-
 
 		ws.WriteMessage(
 			1,
@@ -92,15 +77,10 @@ func sendHistory(ws *websocket.Conn) {
 
 }
 
-
-
-
-
 func handleConnections(
 	w http.ResponseWriter,
 	r *http.Request,
-){
-
+) {
 
 	ws, err := upgrader.Upgrade(
 		w,
@@ -108,15 +88,11 @@ func handleConnections(
 		nil,
 	)
 
-
 	if err != nil {
 		return
 	}
 
-
 	defer ws.Close()
-
-
 
 	_, p, err := ws.ReadMessage()
 
@@ -124,14 +100,10 @@ func handleConnections(
 		return
 	}
 
-
-
 	username :=
 		strings.TrimSpace(
 			string(p),
 		)
-
-
 
 	mutex.Lock()
 
@@ -139,32 +111,20 @@ func handleConnections(
 
 	mutex.Unlock()
 
-
-
 	fmt.Println(
 		"LOG: Usuario conectado:",
 		username,
 	)
 
-
-
 	// Enviar mensajes antiguos
 
 	sendHistory(ws)
 
-
-
-
-
 	for {
-
-
 
 		_, msg, err := ws.ReadMessage()
 
-
 		if err != nil {
-
 
 			mutex.Lock()
 
@@ -175,32 +135,21 @@ func handleConnections(
 
 			mutex.Unlock()
 
-
 			fmt.Println(
 				"LOG: Usuario desconectado:",
 				username,
 			)
 
-
 			break
 
 		}
 
-
-
-
 		message :=
 			string(msg)
 
-
-
-
-
 		// PRIVADOS
 
-		if strings.HasPrefix(message,"@"){
-
-
+		if strings.HasPrefix(message, "@") {
 
 			parts :=
 				strings.SplitN(
@@ -209,34 +158,23 @@ func handleConnections(
 					2,
 				)
 
-
-
 			target :=
 				strings.TrimPrefix(
 					parts[0],
 					"@",
 				)
 
-
-
-			if len(parts)>1 {
-
-
+			if len(parts) > 1 {
 
 				private :=
-					"(Privado de "+
-					username+
-					"): "+
-					parts[1]
-
-
+					"(Privado de " +
+						username +
+						"): " +
+						parts[1]
 
 				mutex.Lock()
 
-
-
 				if userConn, ok := clients[target]; ok {
-
 
 					userConn.WriteMessage(
 						1,
@@ -245,31 +183,20 @@ func handleConnections(
 
 				}
 
-
-
 				mutex.Unlock()
 
 			}
-
-
 
 			continue
 
 		}
 
-
-
-
-
 		// COMUNIDAD
 
-
 		fullMessage :=
-			username+
-			": "+
-			message
-
-
+			username +
+				": " +
+				message
 
 		// Guardar
 
@@ -278,16 +205,9 @@ func handleConnections(
 			message,
 		)
 
-
-
-
-
 		mutex.Lock()
 
-
-
-		for _,client := range clients {
-
+		for _, client := range clients {
 
 			client.WriteMessage(
 				1,
@@ -296,29 +216,15 @@ func handleConnections(
 
 		}
 
-
-
 		mutex.Unlock()
-
-
 
 	}
 
-
-
 }
 
-
-
-
-
-func main(){
-
-
+func main() {
 
 	var err error
-
-
 
 	db, err =
 		sql.Open(
@@ -326,16 +232,11 @@ func main(){
 			"sway.db",
 		)
 
-
-
 	if err != nil {
 		panic(err)
 	}
 
-
-
-
-	_,err =
+	_, err =
 		db.Exec(`
 
 CREATE TABLE IF NOT EXISTS messages(
@@ -354,30 +255,20 @@ created DATETIME DEFAULT CURRENT_TIMESTAMP
 
 `)
 
-
-
 	if err != nil {
 		panic(err)
 	}
 
-
-
-
-
 	fmt.Println(
 		"Base de datos SQLite lista",
 	)
-
-
-
-
 
 	http.HandleFunc(
 		"/",
 		func(
 			w http.ResponseWriter,
 			r *http.Request,
-		){
+		) {
 
 			http.ServeFile(
 				w,
@@ -388,38 +279,24 @@ created DATETIME DEFAULT CURRENT_TIMESTAMP
 		},
 	)
 
-
-
-
 	http.HandleFunc(
 		"/ws",
 		handleConnections,
 	)
 
-
-
-
-
 	port :=
 		os.Getenv("PORT")
 
+	if port == "" {
 
-
-	if port==""{
-
-		port="8080"
+		port = "8080"
 
 	}
-
-
 
 	fmt.Println(
 		"Sway activo en puerto:",
 		port,
 	)
-
-
-
 
 	http.ListenAndServe(
 		":"+port,
