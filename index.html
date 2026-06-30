@@ -99,7 +99,6 @@
 
         function logout() {
             localStorage.removeItem("swayUsername");
-            // Nueva lógica: invalidar sesión de Google
             if (window.google && window.google.accounts) {
                 google.accounts.id.disableAutoSelect();
             }
@@ -127,7 +126,9 @@
         ws.onmessage = (event) => {
             const myName = localStorage.getItem("swayUsername");
             const msgData = event.data;
-            if (msgData.startsWith("SISTEMA:")) { alert(msgData); return; }
+            
+            // ELIMINADA LA LÍNEA DEL ALERT AQUÍ
+            
             const privMatch = msgData.match(/^\(Privado de (.*?)\): (.*)$/);
             if (privMatch) {
                 const sender = privMatch[1];
