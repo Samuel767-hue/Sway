@@ -11,11 +11,12 @@ import (
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 )
+var db *sql.DB
 
 var (
-	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
+	clients = make(map[string]*websocket.Conn)
+	mutex = sync.Mutex{}
+)
 		},
 	}
 
