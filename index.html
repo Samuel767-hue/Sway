@@ -21,7 +21,12 @@
         
         /* Login */
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; z-index: 100; }
-        #login-box { background: #121212; padding: 40px; border-radius: 20px; text-align: center; width: 80%; max-width: 320px; border: 1px solid #333; }
+        #login-box { 
+            background: #121212; padding: 40px; border-radius: 20px; 
+            text-align: center; width: 80%; max-width: 320px; 
+            border: 1px solid #333; 
+            height: fit-content; /* FIX: Evita que la caja se estire sola */
+        }
         .divider { display: flex; align-items: center; text-align: center; margin: 20px 0; color: #666; font-size: 12px; }
         .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #333; }
         .divider:not(:empty)::before { margin-right: .25em; }
@@ -147,7 +152,7 @@
             loginSuccess(googleName);
         }
 
-        // --- RECEPCIÓN Y ENVÍO DE MENSAJES (Igual que antes) ---
+        // --- RECEPCIÓN Y ENVÍO DE MENSAJES ---
         ws.onmessage = (event) => {
             const myName = localStorage.getItem("swayUsername");
             const msgData = event.data;
