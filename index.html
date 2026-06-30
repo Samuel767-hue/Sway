@@ -34,7 +34,6 @@
         input { flex-grow: 1; padding: 14px; border-radius: 25px; border: none; background: #1a1a1a; color: white; outline: none; }
         button.btn-send { padding: 12px 25px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
 
-        /* Estilos nuevos para la lista de amigos inspirados en TikTok (image_64b3d7.png) */
         .btn-add-friend { background: #fe2c55; color: #fff; border: none; padding: 12px; border-radius: 15px; width: 100%; margin-bottom: 15px; cursor: pointer; font-weight: bold; text-align: center; font-size: 14px; }
         .friend-item { display: flex; align-items: center; padding: 12px 10px; border-bottom: 1px solid #1a1a1a; cursor: pointer; border-radius: 10px; transition: background 0.2s; }
         .friend-item:hover { background: #121212; }
@@ -94,14 +93,17 @@
         let currentMode = "comunidad";
         let chatHistories = { "comunidad": [] };
         let pendingRequests = [];
-        
-        // Cargar lista de amigos guardada de forma persistente
-        let friends = JSON.parse(localStorage.getItem("swayFriends")) || [];
+        let friends = [];
         
         window.onload = () => {
             const savedName = localStorage.getItem("swayUsername");
             if (savedName) {
-                setTimeout(() => { ws.send(savedName); document.getElementById("login-screen").style.display = "none"; switchTab("comunidad"); }, 500);
+                setTimeout(() => { 
+                    ws.send(savedName); 
+                    document.getElementById("login-screen").style.display = "none"; 
+                    loadFriendsForUser(savedName);
+                    switchTab("comunidad"); 
+                }, 500);
             }
         };
 
@@ -122,7 +124,20 @@
             localStorage.setItem("swayUsername", name);
             ws.send(name);
             document.getElementById("login-screen").style.display = "none";
+            loadFriendsForUser(name);
             switchTab("comunidad");
+        }
+
+        function loadFriendsForUser(username) {
+            // Carga los amigos usando una clave única para cada cuenta
+            friends = JSON.parse(localStorage.getItem("swayFriends_" + username)) || [];
+        }
+
+        function saveFriends() {
+            const myName = localStorage.getItem("swayUsername");
+            if (myName) {
+                localStorage.setItem("swayFriends_" + myName, JSON.stringify(friends));
+            }
         }
 
         function decodeJwtResponse(token) {
@@ -135,10 +150,6 @@
         function handleGoogleLogin(response) {
             const responsePayload = decodeJwtResponse(response.credential);
             loginSuccess(responsePayload.name);
-        }
-
-        function saveFriends() {
-            localStorage.setItem("swayFriends", JSON.stringify(friends));
         }
 
         ws.onmessage = (event) => {
@@ -162,7 +173,6 @@
                     return; 
                 }
                 
-                // Si te llega un mensaje de alguien, asegúrate de tenerlo en la lista guardada
                 if (!friends.includes(sender)) {
                     friends.push(sender);
                     saveFriends();
@@ -189,7 +199,6 @@
             const container = document.getElementById("chat-container");
             container.innerHTML = "";
             
-            // Si es un chat directo con un amigo, meter el botón para volver a la lista (Estilo TikTok)
             if (currentMode !== "comunidad" && currentMode !== "privado_list") {
                 const backBar = document.createElement("div");
                 backBar.className = "back-chat-bar";
@@ -207,7 +216,6 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // Renderizar el listado visual de amigos guardados
         function renderFriendsList() {
             const container = document.getElementById("chat-container");
             container.innerHTML = "";
@@ -280,7 +288,7 @@
                 document.getElementById("tab-privado").innerText = "Privado 🔒";
                 renderChat();
             } else if (mode === "privado_list") {
-                inputArea.style.display = "none"; // Ocultar input mientras miras la lista
+                inputArea.style.display = "none";
                 document.getElementById("tab-privado").innerText = "Privado 🔒";
                 renderFriendsList();
             } else {
