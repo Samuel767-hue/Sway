@@ -7,55 +7,38 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        /* Top Bar & Notificaciones */
         #top-bar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: #121212; border-bottom: 1px solid #262626; z-index: 40; }
         .top-controls { display: flex; align-items: center; gap: 15px; }
         .btn-logout { background: transparent; border: 1px solid #fe2c55; color: #fe2c55; padding: 5px 12px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: bold; }
         #bell-container { position: relative; cursor: pointer; font-size: 22px; user-select: none; }
         #bell-badge { position: absolute; top: -5px; right: -5px; background: #fe2c55; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; display: none; justify-content: center; align-items: center; font-weight: bold; }
-        
         #notif-panel { position: absolute; top: 40px; right: 0px; background: #1a1a1a; border: 1px solid #333; border-radius: 10px; width: 260px; display: none; flex-direction: column; z-index: 50; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .notif-item { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .btn-acc { background: #fe2c55; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-weight: bold; }
-        
-        /* Login */
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; z-index: 100; }
-        #login-box { 
-            background: #121212; padding: 40px; border-radius: 20px; 
-            text-align: center; width: 80%; max-width: 320px; 
-            border: 1px solid #333; 
-            height: fit-content; /* FIX: Evita que la caja se estire sola */
-        }
+        #login-box { background: #121212; padding: 40px; border-radius: 20px; text-align: center; width: 80%; max-width: 320px; border: 1px solid #333; height: fit-content; }
         .divider { display: flex; align-items: center; text-align: center; margin: 20px 0; color: #666; font-size: 12px; }
         .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #333; }
         .divider:not(:empty)::before { margin-right: .25em; }
         .divider:not(:empty)::after { margin-left: .25em; }
-        
-        /* Chat Area */
         #chat-container { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
         .msg { padding: 12px 18px; border-radius: 18px; width: fit-content; max-width: 85%; animation: fadeIn 0.2s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .msg-them { background: #262626; align-self: flex-start; border-bottom-left-radius: 5px; }
         .msg-me { background: #fff; color: #000; align-self: flex-end; border-bottom-right-radius: 5px; }
         .msg-sys { background: transparent; color: #888; align-self: center; font-size: 12px; font-style: italic; text-align: center; }
-
-        /* Controles Inferiores */
         #tabs { display: flex; background: #000; padding: 10px 20px 0 20px; gap: 15px; }
         .tab { background: #1a1a1a; color: #888; border: 1px solid #333; border-bottom: none; padding: 10px 20px; border-radius: 15px 15px 0 0; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .tab.active { background: #262626; color: #fff; border-color: #444; }
-        
         #input-area { padding: 20px; background: #262626; display: flex; gap: 10px; }
         input { flex-grow: 1; padding: 14px; border-radius: 25px; border: none; background: #1a1a1a; color: white; outline: none; }
         button.btn-send { padding: 12px 25px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-
     <div id="login-screen">
         <div id="login-box">
             <h2>Sway</h2>
-            
             <div id="g_id_onload"
                  data-client_id="531379066398-v8r20953jk0hugfsjj1a9ij65nd3hqas.apps.googleusercontent.com"
                  data-context="signin"
@@ -63,11 +46,8 @@
                  data-callback="handleGoogleLogin"
                  data-auto_prompt="false">
             </div>
-            <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="center" style="display: flex; justify-content: center; margin-bottom: 10px;">
-            </div>
-
+            <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="center" style="display: flex; justify-content: center; margin-bottom: 10px;"></div>
             <div class="divider">O entra como invitado</div>
-
             <input id="username" placeholder="Nombre inventado..." autocomplete="off">
             <br><br>
             <button class="btn-send" onclick="register()" style="width: 100%;">Entrar</button>
@@ -78,8 +58,7 @@
         <h2 style="margin: 0; font-size: 20px;">Sway</h2>
         <div class="top-controls">
             <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
-            <div id="bell-container" onclick="toggleNotifs()">
-                🔔<div id="bell-badge">0</div>
+            <div id="bell-container" onclick="toggleNotifs()">🔔<div id="bell-badge">0</div>
                 <div id="notif-panel">
                     <div style="padding: 10px; color: #888; font-size: 12px; text-align: center;" id="notif-empty">No hay notificaciones</div>
                     <div id="notif-list"></div>
@@ -102,7 +81,6 @@
 
     <script>
         const ws = new WebSocket((window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws");
-        
         let currentMode = "comunidad";
         let chatHistories = { "comunidad": [] };
         let pendingRequests = [];
@@ -110,14 +88,10 @@
         window.onload = () => {
             const savedName = localStorage.getItem("swayUsername");
             if (savedName) {
-                setTimeout(() => {
-                    ws.send(savedName);
-                    document.getElementById("login-screen").style.display = "none";
-                }, 500);
+                setTimeout(() => { ws.send(savedName); document.getElementById("login-screen").style.display = "none"; }, 500);
             }
         };
 
-        // --- SISTEMA DE LOGIN Y LOGOUT ---
         function register() {
             const name = document.getElementById("username").value.trim();
             if (name) loginSuccess(name);
@@ -125,7 +99,11 @@
 
         function logout() {
             localStorage.removeItem("swayUsername");
-            window.location.reload(); // Recarga la página y resetea todo
+            // Nueva lógica: invalidar sesión de Google
+            if (window.google && window.google.accounts) {
+                google.accounts.id.disableAutoSelect();
+            }
+            window.location.reload(); 
         }
 
         function loginSuccess(name) {
@@ -134,55 +112,34 @@
             document.getElementById("login-screen").style.display = "none";
         }
 
-        // Descodifica el token seguro que envía Google para extraer el nombre
         function decodeJwtResponse(token) {
             let base64Url = token.split('.')[1];
             let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            let jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
+            let jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join(''));
             return JSON.parse(jsonPayload);
         }
 
-        // Se ejecuta cuando Google aprueba el inicio de sesión
         function handleGoogleLogin(response) {
             const responsePayload = decodeJwtResponse(response.credential);
-            // Usamos el nombre real de su cuenta de Google
-            const googleName = responsePayload.name; 
-            loginSuccess(googleName);
+            loginSuccess(responsePayload.name);
         }
 
-        // --- RECEPCIÓN Y ENVÍO DE MENSAJES ---
         ws.onmessage = (event) => {
             const myName = localStorage.getItem("swayUsername");
             const msgData = event.data;
-
             if (msgData.startsWith("SISTEMA:")) { alert(msgData); return; }
-
             const privMatch = msgData.match(/^\(Privado de (.*?)\): (.*)$/);
             if (privMatch) {
                 const sender = privMatch[1];
                 const content = privMatch[2];
-
-                if (content === "/SYS_REQ") {
-                    if (!pendingRequests.includes(sender)) { pendingRequests.push(sender); updateBell(); }
-                    return;
-                }
-                if (content === "/SYS_ACC") {
-                    addMessageToHistory(sender, "El usuario ha aceptado tu petición. ¡Ya podéis hablar!", "sys");
-                    if (currentMode === sender) renderChat();
-                    return;
-                }
+                if (content === "/SYS_REQ") { if (!pendingRequests.includes(sender)) { pendingRequests.push(sender); updateBell(); } return; }
+                if (content === "/SYS_ACC") { addMessageToHistory(sender, "El usuario ha aceptado tu petición.", "sys"); if (currentMode === sender) renderChat(); return; }
                 addMessageToHistory(sender, content, "them");
-                if (currentMode === sender) renderChat();
-                else document.getElementById("tab-privado").innerText = "Privado 🔴";
+                if (currentMode === sender) renderChat(); else document.getElementById("tab-privado").innerText = "Privado 🔴";
                 return;
             }
-
-            let sender = "them";
-            let text = msgData;
+            let sender = "them"; let text = msgData;
             if (msgData.startsWith(myName + ": ")) { sender = "me"; text = msgData.replace(myName + ": ", ""); }
-            
             addMessageToHistory("comunidad", text, sender);
             if (currentMode === "comunidad") renderChat();
         };
@@ -195,8 +152,7 @@
         function renderChat() {
             const container = document.getElementById("chat-container");
             container.innerHTML = "";
-            const history = chatHistories[currentMode] || [];
-            history.forEach(msg => {
+            (chatHistories[currentMode] || []).forEach(msg => {
                 const div = document.createElement("div");
                 div.className = "msg msg-" + msg.type;
                 div.innerText = msg.text;
@@ -209,68 +165,42 @@
             currentMode = mode;
             document.getElementById("tab-comunidad").classList.toggle("active", mode === "comunidad");
             document.getElementById("tab-privado").classList.toggle("active", mode !== "comunidad");
-            if (mode === "comunidad") {
-                document.getElementById("input").placeholder = "Mensaje a la comunidad...";
-                document.getElementById("tab-privado").innerText = "Privado 🔒";
-            } else {
-                document.getElementById("input").placeholder = "Mensaje privado para " + mode + "...";
-                document.getElementById("tab-privado").innerText = mode + " 🔒";
-            }
+            if (mode === "comunidad") { document.getElementById("input").placeholder = "Mensaje a la comunidad..."; document.getElementById("tab-privado").innerText = "Privado 🔒"; }
+            else { document.getElementById("input").placeholder = "Mensaje para " + mode + "..."; document.getElementById("tab-privado").innerText = mode + " 🔒"; }
             renderChat(); document.getElementById("input").focus();
         }
 
         function setupPrivate() {
-            const target = prompt("¿Con quién quieres abrir un chat privado?");
+            const target = prompt("¿Con quién quieres hablar?");
             if (target && target.trim() !== "") {
                 const cleanTarget = target.trim();
                 ws.send("@" + cleanTarget + " /SYS_REQ");
                 if (!chatHistories[cleanTarget]) chatHistories[cleanTarget] = [];
-                addMessageToHistory(cleanTarget, "Petición enviada a " + cleanTarget + ". Esperando...", "sys");
+                addMessageToHistory(cleanTarget, "Petición enviada a " + cleanTarget + "...", "sys");
                 switchTab(cleanTarget);
             }
         }
 
         function updateBell() {
             const badge = document.getElementById("bell-badge");
-            const empty = document.getElementById("notif-empty");
-            const list = document.getElementById("notif-list");
             badge.innerText = pendingRequests.length;
             badge.style.display = pendingRequests.length > 0 ? "flex" : "none";
-            empty.style.display = pendingRequests.length > 0 ? "none" : "block";
+            const list = document.getElementById("notif-list");
             list.innerHTML = "";
             pendingRequests.forEach(req => {
                 const item = document.createElement("div");
                 item.className = "notif-item";
-                item.innerHTML = `<span><b>${req}</b> quiere hablar</span> <button class="btn-acc" onclick="acceptRequest('${req}')">Aceptar</button>`;
+                item.innerHTML = `<span>${req} quiere hablar</span> <button class="btn-acc" onclick="acceptRequest('${req}')">Aceptar</button>`;
                 list.appendChild(item);
             });
         }
 
-        function toggleNotifs() {
-            const panel = document.getElementById("notif-panel");
-            panel.style.display = panel.style.display === "flex" ? "none" : "flex";
-        }
-
-        function acceptReequest(user) {
-            pendingRequests = pendingRequests.filter(u => u !== user);
-            updateBell(); toggleNotifs();
-            ws.send("@" + user + " /SYS_ACC");
-            switchTab(user);
-        }
-
+        function toggleNotifs() { const panel = document.getElementById("notif-panel"); panel.style.display = panel.style.display === "flex" ? "none" : "flex"; }
+        function acceptRequest(user) { pendingRequests = pendingRequests.filter(u => u !== user); updateBell(); toggleNotifs(); ws.send("@" + user + " /SYS_ACC"); switchTab(user); }
         function send() {
-            const input = document.getElementById("input");
-            const text = input.value.trim();
-            if (text !== "") {
-                if (currentMode === "comunidad") ws.send(text);
-                else {
-                    ws.send("@" + currentMode + " " + text);
-                    addMessageToHistory(currentMode, text, "me"); renderChat();
-                }
-                input.value = "";
-            }
+            const input = document.getElementById("input"); const text = input.value.trim();
+            if (text !== "") { if (currentMode === "comunidad") ws.send(text); else { ws.send("@" + currentMode + " " + text); addMessageToHistory(currentMode, text, "me"); renderChat(); } input.value = ""; }
         }
-
         document.getElementById("input").addEventListener("keypress", (e) => { if (e.key === "Enter") send(); });
     </script>
 </body>
