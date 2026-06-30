@@ -11,43 +11,129 @@ import (
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+
 var db *sql.DB
 
+
 var (
-	clients = make(map[string]*websocket.Conn)
-	mutex = sync.Mutex{}
-)
+	upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
 		},
 	}
 
 	clients = make(map[string]*websocket.Conn)
 
 	mutex = sync.Mutex{}
-
-	// HISTORIAL DE MENSAJES
-	history = make([]string, 0)
 )
 
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
 
-	ws, err := upgrader.Upgrade(w, r, nil)
+func saveMessage(username string, message string, msgType string){
+
+	_, err := db.Exec(
+		"INSERT INTO messages(username,message,type) VALUES(?,?,?)",
+		username,
+		message,
+		msgType,
+	)
+
+
+	if err != nil {
+		fmt.Println("Error guardando:", err)
+	}
+
+}
+
+
+
+
+func sendHistory(ws *websocket.Conn){
+
+
+	rows, err := db.Query(
+		"SELECT username,message FROM messages ORDER BY id ASC",
+	)
+
 
 	if err != nil {
 		return
 	}
 
+
+	defer rows.Close()
+
+
+
+	for rows.Next(){
+
+		var user string
+		var msg string
+
+
+		rows.Scan(
+			&user,
+			&msg,
+		)
+
+
+
+		ws.WriteMessage(
+			1,
+			[]byte(
+				user+": "+msg,
+			),
+		)
+
+	}
+
+}
+
+
+
+
+
+func handleConnections(
+	w http.ResponseWriter,
+	r *http.Request,
+){
+
+
+	ws, err := upgrader.Upgrade(
+		w,
+		r,
+		nil,
+	)
+
+
+	if err != nil {
+		return
+	}
+
+
 	defer ws.Close()
 
 
-	// Entrada usuario
-	ws.WriteMessage(1, []byte("SISTEMA: Escribe tu nombre para entrar"))
+
+	ws.WriteMessage(
+		1,
+		[]byte(
+			"SISTEMA: Escribe tu nombre para entrar",
+		),
+	)
+
 
 
 	_, p, _ := ws.ReadMessage()
 
 
-	username := strings.TrimSpace(string(p))
+	username :=
+		strings.TrimSpace(
+			string(p),
+		)
+
+
 
 
 	mutex.Lock()
@@ -56,17 +142,23 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	clients[username] = ws
 
 
-	fmt.Println("LOG: Usuario conectado:", username)
+
+	fmt.Println(
+		"Usuario conectado:",
+		username,
+	)
 
 
 
-	// Enviar historial al entrar
-	for _, oldMessage := range history {
-		ws.WriteMessage(1, []byte(oldMessage))
-	}
+	// Cargar comunidad
+
+	sendHistory(ws)
+
 
 
 	mutex.Unlock()
+
+
 
 
 
@@ -81,10 +173,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 			mutex.Lock()
 
-			delete(clients, username)
 
-
-			fmt.Println("LOG: Usuario desconectado:", username)
+			delete(
+				clients,
+				username,
+			)
 
 
 			mutex.Unlock()
@@ -99,26 +192,28 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 
 
-		fmt.Println(
-			"LOG:",
-			username,
-			":",
-			message,
-		)
+
+
+		// PRIVADOS
+
+		if strings.HasPrefix(message,"@"){
+
+
+			parts :=
+				strings.SplitN(
+					message,
+					" ",
+					2,
+				)
 
 
 
+			target :=
+				strings.TrimPrefix(
+					parts[0],
+					"@",
+				)
 
-		// MENSAJES PRIVADOS
-
-		if strings.HasPrefix(message, "@") {
-
-
-			parts := strings.SplitN(message, " ", 2)
-
-
-
-			target := strings.TrimPrefix(parts[0], "@")
 
 
 
@@ -129,64 +224,26 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			if conn, ok := clients[target]; ok {
 
 
-				if len(parts) > 1 {
+
+				if len(parts)>1{
 
 
-
-					privateMessage :=
-						"(Privado de " +
-						username +
-						"): " +
+					private :=
+						"(Privado de "+
+						username+
+						"): "+
 						parts[1]
-
-
-
-					// Guardar privado
-
-					history = append(
-						history,
-						privateMessage,
-					)
 
 
 
 					conn.WriteMessage(
 						1,
-						[]byte(privateMessage),
+						[]byte(private),
 					)
 
-
-
-					fmt.Println(
-						"LOG: Privado enviado a",
-						target,
-					)
-
-
-
-				} else {
-
-
-					ws.WriteMessage(
-						1,
-						[]byte(
-							"SISTEMA: Error formato @usuario mensaje",
-						),
-					)
 
 				}
 
-
-
-			} else {
-
-
-				ws.WriteMessage(
-					1,
-					[]byte(
-						"SISTEMA: Usuario "+target+" no encontrado",
-					),
-				)
 
 			}
 
@@ -196,17 +253,29 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 
 
-		} else {
+
+		}else{
 
 
 
-			// MENSAJE COMUNIDAD
+			// COMUNIDAD
 
 
-			fullMessage :=
-				username +
-				": " +
+			full :=
+				username+
+				": "+
 				message
+
+
+
+			// GUARDAR EN SQLITE
+
+			saveMessage(
+				username,
+				message,
+				"community",
+			)
+
 
 
 
@@ -214,24 +283,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 
 
-			// Guardar mensaje
-
-			history = append(
-				history,
-				fullMessage,
-			)
-
-
-
-			// Enviar a todos
-
-			for _, client := range clients {
+			for _,client := range clients{
 
 
 				client.WriteMessage(
 					1,
-					[]byte(fullMessage),
+					[]byte(full),
 				)
+
 
 			}
 
@@ -242,14 +301,68 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 
+
 	}
+
 
 }
 
 
 
 
+
+
 func main(){
+
+
+
+	var err error
+
+
+
+	db, err =
+		sql.Open(
+			"sqlite3",
+			"sway.db",
+		)
+
+
+
+	if err != nil{
+		panic(err)
+	}
+
+
+
+
+	_,err =
+		db.Exec(`
+
+		CREATE TABLE IF NOT EXISTS messages(
+
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+			username TEXT,
+
+			message TEXT,
+
+			type TEXT,
+
+			created DATETIME DEFAULT CURRENT_TIMESTAMP
+
+		)
+
+		`)
+
+
+
+	if err != nil{
+		panic(err)
+	}
+
+
+
+
 
 
 	http.HandleFunc(
@@ -270,6 +383,7 @@ func main(){
 
 
 
+
 	http.HandleFunc(
 		"/ws",
 		handleConnections,
@@ -277,20 +391,23 @@ func main(){
 
 
 
-	port := os.Getenv("PORT")
+
+
+	port :=
+		os.Getenv("PORT")
 
 
 
-	if port == "" {
+	if port==""{
 
-		port = "8080"
+		port="8080"
 
 	}
 
 
 
 	fmt.Println(
-		"Sway activo en puerto:",
+		"Sway funcionando en:",
 		port,
 	)
 
@@ -300,5 +417,6 @@ func main(){
 		":"+port,
 		nil,
 	)
+
 
 }
