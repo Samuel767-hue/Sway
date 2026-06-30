@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -26,20 +26,22 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		_, msg, err := ws.ReadMessage()
-		if err != nil { break }
-		
+		if err != nil {
+			break
+		}
+
 		text := string(msg)
 		if strings.HasPrefix(text, "@") {
 			// Lógica privado
 			parts := strings.SplitN(text, " ", 2)
 			target := strings.TrimPrefix(parts[0], "@")
 			if conn, ok := clients[target]; ok {
-				conn.WriteMessage(1, []byte(username + ": " + parts[1]))
+				conn.WriteMessage(1, []byte(username+": "+parts[1]))
 			}
 		} else {
 			// Lógica comunidad
 			for _, client := range clients {
-				client.WriteMessage(1, []byte(username + ": " + text))
+				client.WriteMessage(1, []byte(username+": "+text))
 			}
 		}
 	}
