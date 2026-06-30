@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
