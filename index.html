@@ -96,12 +96,15 @@
         let friends = [];
         
         window.onload = () => {
+            // Cargar primero los chats de la comunidad globales
+            chatHistories["comunidad"] = JSON.parse(localStorage.getItem("swayCommunityChats")) || [];
+            
             const savedName = localStorage.getItem("swayUsername");
             if (savedName) {
                 setTimeout(() => { 
                     ws.send(savedName); 
                     document.getElementById("login-screen").style.display = "none"; 
-                    loadFriendsForUser(savedName);
+                    loadUserData(savedName);
                     switchTab("comunidad"); 
                 }, 500);
             }
@@ -124,19 +127,37 @@
             localStorage.setItem("swayUsername", name);
             ws.send(name);
             document.getElementById("login-screen").style.display = "none";
-            loadFriendsForUser(name);
+            loadUserData(name);
             switchTab("comunidad");
         }
 
-        function loadFriendsForUser(username) {
-            // Carga los amigos usando una clave única para cada cuenta
+        function loadUserData(username) {
+            // Carga amigos y chats privados específicos de esta cuenta
             friends = JSON.parse(localStorage.getItem("swayFriends_" + username)) || [];
+            
+            const savedPrivateChats = JSON.parse(localStorage.getItem("swayChats_" + username)) || {};
+            // Mezclar chats privados cargados con el de la comunidad que ya existía
+            chatHistories = { "comunidad": chatHistories["comunidad"], ...savedPrivateChats };
         }
 
         function saveFriends() {
             const myName = localStorage.getItem("swayUsername");
             if (myName) {
                 localStorage.setItem("swayFriends_" + myName, JSON.stringify(friends));
+            }
+        }
+
+        function saveChats() {
+            const myName = localStorage.getItem("swayUsername");
+            
+            // Guardar chat público independientemente
+            localStorage.setItem("swayCommunityChats", JSON.stringify(chatHistories["comunidad"]));
+            
+            // Separar y guardar chats privados vinculados al usuario actual
+            if (myName) {
+                const privateChats = { ...chatHistories };
+                delete privateChats["comunidad"]; // No mezclar lo público en la clave privada
+                localStorage.setItem("swayChats_" + myName, JSON.stringify(privateChats));
             }
         }
 
@@ -168,6 +189,7 @@
                 if (content === "/SYS_ACC") { 
                     if (!friends.includes(sender)) { friends.push(sender); saveFriends(); }
                     addMessageToHistory(sender, "¡Ahora sois amigos!", "sys"); 
+                    saveChats();
                     if (currentMode === sender) renderChat();
                     else if (currentMode === "privado_list") renderFriendsList();
                     return; 
@@ -179,6 +201,7 @@
                 }
 
                 addMessageToHistory(sender, content, "them");
+                saveChats();
                 if (currentMode === sender) renderChat(); 
                 else if (currentMode === "privado_list") renderFriendsList();
                 else document.getElementById("tab-privado").innerText = "Privado 🔴";
@@ -187,6 +210,7 @@
             let sender = "them"; let text = msgData;
             if (msgData.startsWith(myName + ": ")) { sender = "me"; text = msgData.replace(myName + ": ", ""); }
             addMessageToHistory("comunidad", text, sender);
+            saveChats();
             if (currentMode === "comunidad") renderChat();
         };
 
@@ -271,6 +295,7 @@
                 ws.send("@" + cleanTarget + " /SYS_REQ");
                 if (!chatHistories[cleanTarget]) chatHistories[cleanTarget] = [];
                 addMessageToHistory(cleanTarget, "Petición de amistad enviada...", "sys");
+                saveChats();
                 switchTab(cleanTarget);
             }
         }
@@ -326,12 +351,24 @@
             }
             
             ws.send("@" + user + " /SYS_ACC"); 
+            addMessageToHistory(user, "¡Ahora sois amigos!", "sys");
+            saveChats();
             switchTab(user); 
         }
 
         function send() {
             const input = document.getElementById("input"); const text = input.value.trim();
-            if (text !== "") { if (currentMode === "comunidad") ws.send(text); else { ws.send("@" + currentMode + " " + text); addMessageToHistory(currentMode, text, "me"); renderChat(); } input.value = ""; }
+            if (text !== "") { 
+                if (currentMode === "comunidad") {
+                    ws.send(text); 
+                } else { 
+                    ws.send("@" + currentMode + " " + text); 
+                    addMessageToHistory(currentMode, text, "me"); 
+                    renderChat(); 
+                } 
+                saveChats();
+                input.value = ""; 
+            }
         }
         document.getElementById("input").addEventListener("keypress", (e) => { if (e.key === "Enter") send(); });
     </script>
