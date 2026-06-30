@@ -33,6 +33,16 @@
         #input-area { padding: 20px; background: #262626; display: flex; gap: 10px; }
         input { flex-grow: 1; padding: 14px; border-radius: 25px; border: none; background: #1a1a1a; color: white; outline: none; }
         button.btn-send { padding: 12px 25px; background: #fe2c55; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
+
+        /* Estilos nuevos para la lista de amigos inspirados en TikTok (image_64b3d7.png) */
+        .btn-add-friend { background: #fe2c55; color: #fff; border: none; padding: 12px; border-radius: 15px; width: 100%; margin-bottom: 15px; cursor: pointer; font-weight: bold; text-align: center; font-size: 14px; }
+        .friend-item { display: flex; align-items: center; padding: 12px 10px; border-bottom: 1px solid #1a1a1a; cursor: pointer; border-radius: 10px; transition: background 0.2s; }
+        .friend-item:hover { background: #121212; }
+        .friend-avatar { width: 48px; height: 48px; border-radius: 50%; background: #262626; border: 2px solid #fe2c55; margin-right: 15px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 18px; color: #fff; }
+        .friend-info { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .friend-name { font-weight: bold; font-size: 15px; margin-bottom: 3px; color: #fff; }
+        .friend-lastmsg { font-size: 13px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .back-chat-bar { display: flex; align-items: center; padding: 10px 0; margin-bottom: 10px; color: #fe2c55; cursor: pointer; font-weight: bold; font-size: 14px; border-bottom: 1px solid #262626; }
     </style>
 </head>
 <body>
@@ -71,7 +81,7 @@
 
     <div id="tabs">
         <button id="tab-comunidad" class="tab active" onclick="switchTab('comunidad')">Comunidad</button>
-        <button id="tab-privado" class="tab" onclick="setupPrivate()">Privado 🔒</button>
+        <button id="tab-privado" class="tab" onclick="switchTab('privado_list')">Privado 🔒</button>
     </div>
 
     <div id="input-area">
@@ -85,10 +95,13 @@
         let chatHistories = { "comunidad": [] };
         let pendingRequests = [];
         
+        // Cargar lista de amigos guardada de forma persistente
+        let friends = JSON.parse(localStorage.getItem("swayFriends")) || [];
+        
         window.onload = () => {
             const savedName = localStorage.getItem("swayUsername");
             if (savedName) {
-                setTimeout(() => { ws.send(savedName); document.getElementById("login-screen").style.display = "none"; }, 500);
+                setTimeout(() => { ws.send(savedName); document.getElementById("login-screen").style.display = "none"; switchTab("comunidad"); }, 500);
             }
         };
 
@@ -109,6 +122,7 @@
             localStorage.setItem("swayUsername", name);
             ws.send(name);
             document.getElementById("login-screen").style.display = "none";
+            switchTab("comunidad");
         }
 
         function decodeJwtResponse(token) {
@@ -123,20 +137,41 @@
             loginSuccess(responsePayload.name);
         }
 
+        function saveFriends() {
+            localStorage.setItem("swayFriends", JSON.stringify(friends));
+        }
+
         ws.onmessage = (event) => {
             const myName = localStorage.getItem("swayUsername");
             const msgData = event.data;
-            
-            // ELIMINADA LA LÍNEA DEL ALERT AQUÍ
             
             const privMatch = msgData.match(/^\(Privado de (.*?)\): (.*)$/);
             if (privMatch) {
                 const sender = privMatch[1];
                 const content = privMatch[2];
-                if (content === "/SYS_REQ") { if (!pendingRequests.includes(sender)) { pendingRequests.push(sender); updateBell(); } return; }
-                if (content === "/SYS_ACC") { addMessageToHistory(sender, "El usuario ha aceptado tu petición.", "sys"); if (currentMode === sender) renderChat(); return; }
+                
+                if (content === "/SYS_REQ") { 
+                    if (!pendingRequests.includes(sender)) { pendingRequests.push(sender); updateBell(); } 
+                    return; 
+                }
+                if (content === "/SYS_ACC") { 
+                    if (!friends.includes(sender)) { friends.push(sender); saveFriends(); }
+                    addMessageToHistory(sender, "¡Ahora sois amigos!", "sys"); 
+                    if (currentMode === sender) renderChat();
+                    else if (currentMode === "privado_list") renderFriendsList();
+                    return; 
+                }
+                
+                // Si te llega un mensaje de alguien, asegúrate de tenerlo en la lista guardada
+                if (!friends.includes(sender)) {
+                    friends.push(sender);
+                    saveFriends();
+                }
+
                 addMessageToHistory(sender, content, "them");
-                if (currentMode === sender) renderChat(); else document.getElementById("tab-privado").innerText = "Privado 🔴";
+                if (currentMode === sender) renderChat(); 
+                else if (currentMode === "privado_list") renderFriendsList();
+                else document.getElementById("tab-privado").innerText = "Privado 🔴";
                 return;
             }
             let sender = "them"; let text = msgData;
@@ -153,6 +188,16 @@
         function renderChat() {
             const container = document.getElementById("chat-container");
             container.innerHTML = "";
+            
+            // Si es un chat directo con un amigo, meter el botón para volver a la lista (Estilo TikTok)
+            if (currentMode !== "comunidad" && currentMode !== "privado_list") {
+                const backBar = document.createElement("div");
+                backBar.className = "back-chat-bar";
+                backBar.innerText = "← Volver a Amigos";
+                backBar.onclick = () => switchTab("privado_list");
+                container.appendChild(backBar);
+            }
+
             (chatHistories[currentMode] || []).forEach(msg => {
                 const div = document.createElement("div");
                 div.className = "msg msg-" + msg.type;
@@ -162,23 +207,87 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        // Renderizar el listado visual de amigos guardados
+        function renderFriendsList() {
+            const container = document.getElementById("chat-container");
+            container.innerHTML = "";
+
+            const addBtn = document.createElement("button");
+            addBtn.className = "btn-add-friend";
+            addBtn.innerText = "+ Añadir amigo por nombre";
+            addBtn.onclick = promptAddFriend;
+            container.appendChild(addBtn);
+
+            if (friends.length === 0) {
+                const empty = document.createElement("div");
+                empty.style.color = "#666";
+                empty.style.textAlign = "center";
+                empty.style.marginTop = "30px";
+                empty.innerText = "No tienes amigos guardados todavía.";
+                container.appendChild(empty);
+                return;
+            }
+
+            friends.forEach(friend => {
+                const item = document.createElement("div");
+                item.className = "friend-item";
+                item.onclick = () => switchTab(friend);
+
+                const initial = friend.charAt(0).toUpperCase();
+                let lastMsg = "Sin mensajes aún";
+                const history = chatHistories[friend];
+                if (history && history.length > 0) {
+                    const last = history[history.length - 1];
+                    lastMsg = (last.type === "me" ? "Tú: " : "") + last.text;
+                }
+
+                item.innerHTML = `
+                    <div class="friend-avatar">${initial}</div>
+                    <div class="friend-info">
+                        <div class="friend-name">${friend}</div>
+                        <div class="friend-lastmsg">${lastMsg}</div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function promptAddFriend() {
+            const target = prompt("¿A quién quieres añadir de amigo?");
+            if (target && target.trim() !== "") {
+                const cleanTarget = target.trim();
+                if (!friends.includes(cleanTarget)) {
+                    friends.push(cleanTarget);
+                    saveFriends();
+                }
+                ws.send("@" + cleanTarget + " /SYS_REQ");
+                if (!chatHistories[cleanTarget]) chatHistories[cleanTarget] = [];
+                addMessageToHistory(cleanTarget, "Petición de amistad enviada...", "sys");
+                switchTab(cleanTarget);
+            }
+        }
+
         function switchTab(mode) {
             currentMode = mode;
             document.getElementById("tab-comunidad").classList.toggle("active", mode === "comunidad");
             document.getElementById("tab-privado").classList.toggle("active", mode !== "comunidad");
-            if (mode === "comunidad") { document.getElementById("input").placeholder = "Mensaje a la comunidad..."; document.getElementById("tab-privado").innerText = "Privado 🔒"; }
-            else { document.getElementById("input").placeholder = "Mensaje para " + mode + "..."; document.getElementById("tab-privado").innerText = mode + " 🔒"; }
-            renderChat(); document.getElementById("input").focus();
-        }
+            
+            const inputArea = document.getElementById("input-area");
 
-        function setupPrivate() {
-            const target = prompt("¿Con quién quieres hablar?");
-            if (target && target.trim() !== "") {
-                const cleanTarget = target.trim();
-                ws.send("@" + cleanTarget + " /SYS_REQ");
-                if (!chatHistories[cleanTarget]) chatHistories[cleanTarget] = [];
-                addMessageToHistory(cleanTarget, "Petición enviada a " + cleanTarget + "...", "sys");
-                switchTab(cleanTarget);
+            if (mode === "comunidad") {
+                inputArea.style.display = "flex";
+                document.getElementById("input").placeholder = "Mensaje a la comunidad...";
+                document.getElementById("tab-privado").innerText = "Privado 🔒";
+                renderChat();
+            } else if (mode === "privado_list") {
+                inputArea.style.display = "none"; // Ocultar input mientras miras la lista
+                document.getElementById("tab-privado").innerText = "Privado 🔒";
+                renderFriendsList();
+            } else {
+                inputArea.style.display = "flex";
+                document.getElementById("input").placeholder = "Mensaje para " + mode + "...";
+                document.getElementById("tab-privado").innerText = mode + " 🔒";
+                renderChat();
             }
         }
 
@@ -191,13 +300,27 @@
             pendingRequests.forEach(req => {
                 const item = document.createElement("div");
                 item.className = "notif-item";
-                item.innerHTML = `<span>${req} quiere hablar</span> <button class="btn-acc" onclick="acceptRequest('${req}')">Aceptar</button>`;
+                item.innerHTML = `<span>${req} quiere ser tu amigo</span> <button class="btn-acc" onclick="acceptRequest('${req}')">Aceptar</button>`;
                 list.appendChild(item);
             });
         }
 
         function toggleNotifs() { const panel = document.getElementById("notif-panel"); panel.style.display = panel.style.display === "flex" ? "none" : "flex"; }
-        function acceptRequest(user) { pendingRequests = pendingRequests.filter(u => u !== user); updateBell(); toggleNotifs(); ws.send("@" + user + " /SYS_ACC"); switchTab(user); }
+        
+        function acceptRequest(user) { 
+            pendingRequests = pendingRequests.filter(u => u !== user); 
+            updateBell(); 
+            toggleNotifs(); 
+            
+            if (!friends.includes(user)) {
+                friends.push(user);
+                saveFriends();
+            }
+            
+            ws.send("@" + user + " /SYS_ACC"); 
+            switchTab(user); 
+        }
+
         function send() {
             const input = document.getElementById("input"); const text = input.value.trim();
             if (text !== "") { if (currentMode === "comunidad") ws.send(text); else { ws.send("@" + currentMode + " " + text); addMessageToHistory(currentMode, text, "me"); renderChat(); } input.value = ""; }
