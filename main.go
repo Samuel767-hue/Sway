@@ -12,7 +12,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-
 var db *sql.DB
 
 
@@ -30,26 +29,25 @@ var (
 
 
 
-func saveMessage(username string, message string, msgType string){
+func saveCommunityMessage(username string, message string) {
 
 	_, err := db.Exec(
 		"INSERT INTO messages(username,message,type) VALUES(?,?,?)",
 		username,
 		message,
-		msgType,
+		"community",
 	)
 
 
 	if err != nil {
-		fmt.Println("Error guardando:", err)
+		fmt.Println("Error SQLite:", err)
 	}
 
 }
 
 
 
-
-func sendHistory(ws *websocket.Conn){
+func sendHistory(ws *websocket.Conn) {
 
 
 	rows, err := db.Query(
@@ -58,6 +56,7 @@ func sendHistory(ws *websocket.Conn){
 
 
 	if err != nil {
+		fmt.Println("Error leyendo historial:", err)
 		return
 	}
 
@@ -66,24 +65,27 @@ func sendHistory(ws *websocket.Conn){
 
 
 
-	for rows.Next(){
+	for rows.Next() {
+
 
 		var user string
 		var msg string
 
 
-		rows.Scan(
+		err := rows.Scan(
 			&user,
 			&msg,
 		)
 
 
+		if err != nil {
+			continue
+		}
+
 
 		ws.WriteMessage(
 			1,
-			[]byte(
-				user+": "+msg,
-			),
+			[]byte(user+": "+msg),
 		)
 
 	}
@@ -116,16 +118,12 @@ func handleConnections(
 
 
 
-	ws.WriteMessage(
-		1,
-		[]byte(
-			"SISTEMA: Escribe tu nombre para entrar",
-		),
-	)
+	_, p, err := ws.ReadMessage()
 
+	if err != nil {
+		return
+	}
 
-
-	_, p, _ := ws.ReadMessage()
 
 
 	username :=
@@ -135,34 +133,31 @@ func handleConnections(
 
 
 
-
 	mutex.Lock()
 
-
 	clients[username] = ws
+
+	mutex.Unlock()
 
 
 
 	fmt.Println(
-		"Usuario conectado:",
+		"LOG: Usuario conectado:",
 		username,
 	)
 
 
 
-	// Cargar comunidad
+	// Enviar mensajes antiguos
 
 	sendHistory(ws)
-
-
-
-	mutex.Unlock()
 
 
 
 
 
 	for {
+
 
 
 		_, msg, err := ws.ReadMessage()
@@ -173,22 +168,29 @@ func handleConnections(
 
 			mutex.Lock()
 
-
 			delete(
 				clients,
 				username,
 			)
 
-
 			mutex.Unlock()
 
 
+			fmt.Println(
+				"LOG: Usuario desconectado:",
+				username,
+			)
+
+
 			break
+
 		}
 
 
 
-		message := string(msg)
+
+		message :=
+			string(msg)
 
 
 
@@ -197,6 +199,7 @@ func handleConnections(
 		// PRIVADOS
 
 		if strings.HasPrefix(message,"@"){
+
 
 
 			parts :=
@@ -216,97 +219,94 @@ func handleConnections(
 
 
 
-
-			mutex.Lock()
-
-
-
-			if conn, ok := clients[target]; ok {
+			if len(parts)>1 {
 
 
 
-				if len(parts)>1{
-
-
-					private :=
-						"(Privado de "+
-						username+
-						"): "+
-						parts[1]
+				private :=
+					"(Privado de "+
+					username+
+					"): "+
+					parts[1]
 
 
 
-					conn.WriteMessage(
+				mutex.Lock()
+
+
+
+				if userConn, ok := clients[target]; ok {
+
+
+					userConn.WriteMessage(
 						1,
 						[]byte(private),
 					)
 
-
 				}
 
 
-			}
 
-
-
-			mutex.Unlock()
-
-
-
-
-		}else{
-
-
-
-			// COMUNIDAD
-
-
-			full :=
-				username+
-				": "+
-				message
-
-
-
-			// GUARDAR EN SQLITE
-
-			saveMessage(
-				username,
-				message,
-				"community",
-			)
-
-
-
-
-			mutex.Lock()
-
-
-
-			for _,client := range clients{
-
-
-				client.WriteMessage(
-					1,
-					[]byte(full),
-				)
-
+				mutex.Unlock()
 
 			}
 
 
 
-			mutex.Unlock()
+			continue
 
 		}
+
+
+
+
+
+		// COMUNIDAD
+
+
+		fullMessage :=
+			username+
+			": "+
+			message
+
+
+
+		// Guardar
+
+		saveCommunityMessage(
+			username,
+			message,
+		)
+
+
+
+
+
+		mutex.Lock()
+
+
+
+		for _,client := range clients {
+
+
+			client.WriteMessage(
+				1,
+				[]byte(fullMessage),
+			)
+
+		}
+
+
+
+		mutex.Unlock()
 
 
 
 	}
 
 
-}
 
+}
 
 
 
@@ -328,7 +328,7 @@ func main(){
 
 
 
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 
@@ -338,28 +338,35 @@ func main(){
 	_,err =
 		db.Exec(`
 
-		CREATE TABLE IF NOT EXISTS messages(
+CREATE TABLE IF NOT EXISTS messages(
 
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-			username TEXT,
+username TEXT,
 
-			message TEXT,
+message TEXT,
 
-			type TEXT,
+type TEXT,
 
-			created DATETIME DEFAULT CURRENT_TIMESTAMP
+created DATETIME DEFAULT CURRENT_TIMESTAMP
 
-		)
+)
 
-		`)
+`)
 
 
 
-	if err != nil{
+	if err != nil {
 		panic(err)
 	}
 
+
+
+
+
+	fmt.Println(
+		"Base de datos SQLite lista",
+	)
 
 
 
@@ -407,9 +414,10 @@ func main(){
 
 
 	fmt.Println(
-		"Sway funcionando en:",
+		"Sway activo en puerto:",
 		port,
 	)
+
 
 
 
@@ -417,6 +425,5 @@ func main(){
 		":"+port,
 		nil,
 	)
-
 
 }
