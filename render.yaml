@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sway
+    env: go
+    plan: free
+    region: oregon
+    buildCommand: go build -o app .
+    startCommand: ./app
+    envVars:
+      - key: PORT
+        value: 10000
