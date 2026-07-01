@@ -4,43 +4,201 @@
     <meta charset="UTF-8">
     <title>Sway</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; }
-        #profile { padding: 10px; text-align: center; background: #121212; }
-        #chat { flex: 1; overflow-y: auto; padding: 20px; }
-        .msg { padding: 10px 15px; border-radius: 15px; margin: 8px; max-width: 80%; }
-        .me { background: #fe2c55; color: white; margin-left: auto; }
-        .them { background: #262626; }
-        #bar { display: flex; padding: 15px; gap: 10px; background: #121212; }
-        input { flex: 1; padding: 12px; border-radius: 20px; border: none; }
+        body {
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #profile {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #121212;
+            padding: 10px 25px;
+            border-radius: 25px;
+            z-index: 5;
+            border: 1px solid #262626;
+        }
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 80px 20px 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .msg {
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 8px 0;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .me {
+            background: #ffffff;
+            color: #000000;
+            margin-left: auto;
+            border-radius: 15px 15px 0px 15px;
+        }
+        .them {
+            background: #262626;
+            color: #ffffff;
+            margin-right: auto;
+            border-radius: 15px 15px 15px 0px;
+        }
+        .system {
+            background: #1a1a1a;
+            color: #fe2c55;
+            margin: 8px auto;
+            text-align: center;
+            font-size: 0.9em;
+            border: 1px solid #333;
+        }
+        #controls {
+            background: #121212;
+            padding: 10px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 1px solid #262626;
+        }
+        #tabs {
+            display: flex;
+            gap: 15px;
+        }
+        .tab {
+            padding: 8px 16px;
+            background: #1a1a1a;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            color: #aaa;
+            transition: 0.2s;
+        }
+        .tab:hover {
+            color: #fff;
+        }
+        .tab.active {
+            background: #fe2c55;
+            color: #fff;
+            font-weight: bold;
+        }
+        #bar {
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            color: #fff;
+            outline: none;
+        }
+        input:focus {
+            border-color: #fe2c55;
+        }
+        button {
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: none;
+            background: #fe2c55;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #e0244c;
+        }
     </style>
 </head>
 <body>
-    <div id="profile">👤 <span id="name"></span></div>
+    <div id="profile">👤 <span id="name">Cargando...</span></div>
     <div id="chat"></div>
-    <div id="bar">
-        <input id="input" placeholder="Escribe algo...">
-        <button onclick="send()">Enviar</button>
+    
+    <div id="controls">
+        <div id="tabs">
+            <div class="tab active" id="tab-comunidad" onclick="setMode('comunidad')">Comunidad</div>
+            <div class="tab" id="tab-privado" onclick="setMode('privado')">Privado 🔒</div>
+        </div>
+        <div id="bar">
+            <input id="input" placeholder="Mensaje a la comunidad..." onkeydown="if(event.key === 'Enter') send()">
+            <button onclick="send()">Enviar</button>
+        </div>
     </div>
 
     <script>
-        let user = localStorage.getItem("swayUsername") || prompt("Tu nombre:");
-        localStorage.setItem("swayUsername", user);
+        let currentMode = 'comunidad';
+        let user = localStorage.getItem("swayUsername");
+        
+        if (!user) {
+            user = prompt("Introduce tu nombre de usuario para Sway:") || "Invitado";
+            localStorage.setItem("swayUsername", user);
+        }
         document.getElementById("name").innerText = user;
 
         let ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
-        ws.onopen = () => ws.send(user);
-        ws.onmessage = e => {
-            let d = document.createElement("div");
-            d.className = "msg " + (e.data.startsWith(user+": ") ? "me" : "them");
-            d.innerText = e.data;
-            let c = document.getElementById("chat");
-            c.appendChild(d);
-            c.scrollTop = c.scrollHeight;
+
+        ws.onopen = () => {
+            ws.send(user);
         };
+
+        ws.onmessage = e => {
+            let t = e.data;
+            let c = "them";
+
+            if (t.startsWith("SISTEMA:")) {
+                c = "system";
+            } else if (t.startsWith(user + ": ") || t.startsWith("(Privado de " + user + "):")) {
+                c = "me";
+            }
+
+            if (c === "me" && t.startsWith(user + ": ")) {
+                t = t.replace(user + ": ", "");
+            }
+
+            add(t, c);
+        };
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('tab-comunidad').classList.toggle('active', mode === 'comunidad');
+            document.getElementById('tab-privado').classList.toggle('active', mode === 'privado');
+            
+            let input = document.getElementById("input");
+            if (mode === 'privado') {
+                input.placeholder = "Escribe @usuario mensaje...";
+            } else {
+                input.placeholder = "Mensaje a la comunidad...";
+            }
+            input.focus();
+        }
 
         function send() {
             let i = document.getElementById("input");
-            if(i.value) { ws.send(i.value); i.value = ""; }
+            let val = i.value.trim();
+            if (val) {
+                if (currentMode === 'privado' && !val.startsWith("@")) {
+                    alert("Para enviar un mensaje privado, debes empezar con @usuario seguido del mensaje.");
+                    return;
+                }
+                ws.send(val);
+                i.value = "";
+            }
+        }
+
+        function add(t, c) {
+            let d = document.createElement("div");
+            d.className = "msg " + c;
+            d.innerText = t;
+            let chat = document.getElementById("chat");
+            chat.appendChild(d);
+            chat.scrollTop = chat.scrollHeight; 
         }
     </script>
 </body>
