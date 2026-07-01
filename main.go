@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"os"
-	"strings"
-	"sync"
-	"github.com/gorilla/websocket"
+    "net/http"
+    "os"
+    "strings"
+    "sync"
+    "github.com/gorilla/websocket"
 )
 
 var (
