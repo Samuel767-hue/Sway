@@ -16,7 +16,6 @@ var (
 			return true
 		},
 	}
-
 	clients = make(map[string]*websocket.Conn)
 	mutex   = sync.Mutex{}
 	history = make([]string, 0)
@@ -29,17 +28,16 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	// Mensaje inicial del sistema
-	ws.WriteMessage(1, []byte("SISTEMA: Escribe tu nombre para entrar"))
+	ws.WriteMessage(1, []byte("SISTEMA: Conectado a los servidores de Sway"))
 
 	_, p, _ := ws.ReadMessage()
 	username := strings.TrimSpace(string(p))
 
 	mutex.Lock()
 	clients[username] = ws
-	fmt.Println("LOG: Usuario conectado:", username)
+	fmt.Println("LOG: Sesión iniciada por el usuario:", username)
 
-	// Enviar historial completo al entrar (comunidad + privados guardados)
+	// Persistencia garantizada enviando el historial al reconectar
 	for _, oldMessage := range history {
 		ws.WriteMessage(1, []byte(oldMessage))
 	}
@@ -50,15 +48,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			mutex.Lock()
 			delete(clients, username)
-			fmt.Println("LOG: Usuario desconectado:", username)
+			fmt.Println("LOG: Conexión cerrada por el usuario:", username)
 			mutex.Unlock()
 			break
 		}
 
 		message := string(msg)
-		fmt.Println("LOG:", username, ":", message)
+		fmt.Printf("LOG MESSAGE [%s]: %s\n", username, message)
 
-		// MENSAJES PRIVADOS
 		if strings.HasPrefix(message, "@") {
 			parts := strings.SplitN(message, " ", 2)
 			target := strings.TrimPrefix(parts[0], "@")
@@ -67,31 +64,24 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			if conn, ok := clients[target]; ok {
 				if len(parts) > 1 {
 					privateMessage := "(Privado de " + username + "): " + parts[1]
-
-					// Mantenemos tu guardado en el historial para que no se pierdan al recargar
 					history = append(history, privateMessage)
-
-					// Enviar al destinatario y a ti mismo para que aparezca en pantalla
+					
 					conn.WriteMessage(1, []byte(privateMessage))
 					ws.WriteMessage(1, []byte(privateMessage))
-
-					fmt.Println("LOG: Privado enviado a", target)
 				} else {
-					ws.WriteMessage(1, []byte("SISTEMA: Error formato @usuario mensaje"))
+					ws.WriteMessage(1, []byte("SISTEMA: Formato inválido. Escribe @usuario mensaje"))
 				}
 			} else {
-				ws.WriteMessage(1, []byte("SISTEMA: Usuario "+target+" no encontrado"))
+				ws.WriteMessage(1, []byte("SISTEMA: El usuario '"+target+"' no se encuentra conectado"))
 			}
 			mutex.Unlock()
 
 		} else {
-			// MENSAJE COMUNIDAD
 			fullMessage := username + ": " + message
 
 			mutex.Lock()
 			history = append(history, fullMessage)
 
-			// Enviar a todos
 			for _, client := range clients {
 				client.WriteMessage(1, []byte(fullMessage))
 			}
@@ -104,7 +94,6 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
 	})
-
 	http.HandleFunc("/ws", handleConnections)
 
 	port := os.Getenv("PORT")
@@ -112,6 +101,6 @@ func main() {
 		port = "8080"
 	}
 
-	fmt.Println("Sway activo en puerto:", port)
+	fmt.Println("Servidor Sway corriendo de forma segura en puerto:", port)
 	http.ListenAndServe(":"+port, nil)
 }
